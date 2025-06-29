@@ -1,169 +1,68 @@
+/* eslint-disable @typescript-eslint/no-unused-vars */
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
-
-import type React from "react";
-
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 import {
-  GithubIcon,
-  Zap,
-  Clock,
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import {
   Globe,
   ImageIcon,
   Video,
   NewspaperIcon as News,
   MapPin,
+  Loader2,
+  AlertCircle,
+  SearchIcon,
 } from "lucide-react";
-import { useSearchParams } from "next/navigation";
-import { useState } from "react";
-import Image from "next/image";
+import { useSearchParams, useRouter } from "next/navigation";
+import { useState, useEffect } from "react";
 import Navbar from "@/components/navbar";
-import { Button } from "@/components/ui/button";
 import { motion } from "framer-motion";
+import SearchPagination from "@/components/search-engine-pagination";
 
-// Mock data
-const searchResults = {
-  web: [
-    {
-      id: 1,
-      title: "Anime - Complete Guide to Japanese Animation",
-      url: "https://anime-guide.com",
-      description:
-        "Discover the world of anime with our comprehensive guide covering popular series, genres, and recommendations for beginners and veterans alike.",
-      timestamp: "2 hours ago",
-      favicon: "/placeholder.svg?height=16&width=16",
-    },
-    {
-      id: 2,
-      title: "Top 10 Anime Series of 2024 - Must Watch List",
-      url: "https://animereviews.net",
-      description:
-        "Explore the best anime series released in 2024, featuring detailed reviews, ratings, and where to watch them online.",
-      timestamp: "5 hours ago",
-      favicon: "/placeholder.svg?height=16&width=16",
-    },
-    {
-      id: 3,
-      title: "Anime Streaming Platforms Comparison",
-      url: "https://streamingguide.com/anime",
-      description:
-        "Compare the best anime streaming services including Crunchyroll, Funimation, and Netflix to find your perfect viewing platform.",
-      timestamp: "1 day ago",
-      favicon: "/placeholder.svg?height=16&width=16",
-    },
-    {
-      id: 4,
-      title: "Anime Art Styles Through the Decades",
-      url: "https://animeart.org",
-      description:
-        "A visual journey through the evolution of anime art styles from the 1960s to present day, showcasing iconic series and their artistic influence.",
-      timestamp: "2 days ago",
-      favicon: "/placeholder.svg?height=16&width=16",
-    },
-  ],
-  images: [
-    {
-      id: 1,
-      src: "/placeholder.svg?height=200&width=300",
-      alt: "Anime character art",
-      source: "pixiv.net",
-    },
-    {
-      id: 2,
-      src: "/placeholder.svg?height=200&width=300",
-      alt: "Studio Ghibli scene",
-      source: "ghibli.jp",
-    },
-    {
-      id: 3,
-      src: "/placeholder.svg?height=200&width=300",
-      alt: "Manga panel",
-      source: "mangaplus.com",
-    },
-    {
-      id: 4,
-      src: "/placeholder.svg?height=200&width=300",
-      alt: "Anime poster",
-      source: "crunchyroll.com",
-    },
-    {
-      id: 5,
-      src: "/placeholder.svg?height=200&width=300",
-      alt: "Character design",
-      source: "artstation.com",
-    },
-    {
-      id: 6,
-      src: "/placeholder.svg?height=200&width=300",
-      alt: "Anime wallpaper",
-      source: "wallhaven.cc",
-    },
-  ],
-  videos: [
-    {
-      id: 1,
-      title: "Top 10 Anime of All Time",
-      channel: "AnimeZone",
-      duration: "15:32",
-      views: "2.3M views",
-      timestamp: "3 days ago",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-    },
-    {
-      id: 2,
-      title: "Anime Explained: Understanding Japanese Culture",
-      channel: "CultureCast",
-      duration: "22:15",
-      views: "890K views",
-      timestamp: "1 week ago",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-    },
-    {
-      id: 3,
-      title: "How Anime is Made: Behind the Scenes",
-      channel: "StudioInsights",
-      duration: "18:45",
-      views: "1.5M views",
-      timestamp: "2 weeks ago",
-      thumbnail: "/placeholder.svg?height=120&width=200",
-    },
-  ],
-  news: [
-    {
-      id: 1,
-      title: "New Anime Series Announced for Spring 2024",
-      source: "Anime News Network",
-      timestamp: "4 hours ago",
-      category: "Entertainment",
-    },
-    {
-      id: 2,
-      title: "Studio Ghibli Opens New Theme Park Section",
-      source: "Japan Times",
-      timestamp: "1 day ago",
-      category: "Travel",
-    },
-    {
-      id: 3,
-      title: "Anime Industry Revenue Reaches Record High",
-      source: "Variety",
-      timestamp: "3 days ago",
-      category: "Business",
-    },
-  ],
-};
+interface SearchResult {
+  id: string;
+  index: string;
+  score: number;
+  source: Record<string, any>;
+  highlight?: Record<string, string[]>;
+}
 
-const searchStats = {
-  totalResults: "About 45,600,000 results",
-  searchTime: "0.42 seconds",
-};
+interface SearchResponse {
+  success: boolean;
+  results: SearchResult[];
+  total: any;
+  took: number;
+  query: string;
+  from: number;
+  size: number;
+  error?: string;
+}
+
+const RESULTS_PER_PAGE_OPTIONS = [10, 20, 50, 100];
 
 export default function Search() {
   const searchParams = useSearchParams();
-  const query = searchParams.get("q") || "anime";
+  const router = useRouter();
+
+  const query = searchParams.get("q") || "";
+  const selectedIndex = searchParams.get("index") || "_all";
+  const currentPage = Number.parseInt(searchParams.get("page") || "1");
+  const resultsPerPage = Number.parseInt(searchParams.get("size") || "10");
+
   const [activeTab, setActiveTab] = useState("all");
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [totalResults, setTotalResults] = useState(0);
+  const [searchTime, setSearchTime] = useState(0);
 
   const tabs = [
     { id: "all", label: "All", icon: Globe },
@@ -172,15 +71,166 @@ export default function Search() {
     { id: "news", label: "News", icon: News },
   ];
 
+  const totalPages = Math.ceil(totalResults / resultsPerPage);
+
+  const fetchSearchResults = async (
+    searchQuery: string,
+    page = 1,
+    size = 10
+  ) => {
+    if (!searchQuery.trim()) {
+      setSearchResults([]);
+      setTotalResults(0);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      const from = (page - 1) * size;
+      const params = new URLSearchParams({
+        q: searchQuery,
+        index: selectedIndex,
+        from: from.toString(),
+        size: size.toString(),
+      });
+
+      const response = await fetch(`/api/search?${params}`);
+      const data: SearchResponse = await response.json();
+
+      if (data.success) {
+        setSearchResults(data.results);
+        const totalCount =
+          typeof data.total === "object" ? data.total.value : data.total;
+        setTotalResults(totalCount);
+        setSearchTime(data.took);
+      } else {
+        setError(data.error || "Search failed");
+        setSearchResults([]);
+        setTotalResults(0);
+      }
+    } catch (err) {
+      setError("Failed to connect to search service");
+      setSearchResults([]);
+      setTotalResults(0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handlePageChange = (page: number) => {
+    fetchSearchResults(query, page, resultsPerPage);
+  };
+
+  const handleResultsPerPageChange = (newSize: string) => {
+    const size = Number.parseInt(newSize);
+    const params = new URLSearchParams(searchParams.toString());
+    params.set("size", size.toString());
+    params.delete("page"); // Reset to first page when changing page size
+    router.push(`/search?${params.toString()}`);
+    fetchSearchResults(query, 1, size);
+  };
+
+  useEffect(() => {
+    if (query) {
+      fetchSearchResults(query, currentPage, resultsPerPage);
+    }
+  }, [query, selectedIndex, currentPage, resultsPerPage]);
+
+  const renderHighlightedText = (text: string, highlights?: string[]) => {
+    if (!highlights || highlights.length === 0) {
+      return text;
+    }
+
+    // Use the first highlight if available
+    const highlightedText = highlights[0];
+    return <span dangerouslySetInnerHTML={{ __html: highlightedText }} />;
+  };
+
+  const formatResultTitle = (result: SearchResult) => {
+    const source = result.source;
+    // Try common title fields
+    const title =
+      source.title ||
+      source.name ||
+      source.subject ||
+      source.headline ||
+      `Document ${result.id}`;
+    return renderHighlightedText(title, result.highlight?.title);
+  };
+
+  const formatResultDescription = (result: SearchResult) => {
+    const source = result.source;
+    // Try common description fields
+    const description =
+      source.description ||
+      source.content ||
+      source.body ||
+      source.summary ||
+      "";
+    const truncated =
+      description.length > 200
+        ? description.substring(0, 200) + "..."
+        : description;
+    return renderHighlightedText(
+      truncated,
+      result.highlight?.description || result.highlight?.content
+    );
+  };
+
+  const formatResultUrl = (result: SearchResult) => {
+    const source = result.source;
+    return source.url || source.link || `${result.index}/${result.id}`;
+  };
+
   return (
     <div className="min-h-screen bg-background">
-      {/* Navigation */}
       <Navbar query={query} />
 
       <div className="max-w-6xl mx-auto px-6">
-        {/* Search Stats */}
-        <div className="py-4 text-sm text-gray-600">
-          {searchStats.totalResults} ({searchStats.searchTime})
+        {/* Search Stats and Controls */}
+        <div className="py-4 flex items-center justify-between">
+          <div className="text-sm text-gray-600 flex items-center gap-4">
+            {loading ? (
+              <div className="flex items-center gap-2">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Searching...
+              </div>
+            ) : (
+              <>
+                <span>About {totalResults.toLocaleString()} results</span>
+                <span>({(searchTime / 1000).toFixed(2)} seconds)</span>
+                {selectedIndex !== "_all" && (
+                  <Badge variant="secondary">Index: {selectedIndex}</Badge>
+                )}
+              </>
+            )}
+          </div>
+
+          {/* Results per page selector */}
+          {!loading && totalResults > 0 && (
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-muted-foreground">
+                Results per page:
+              </span>
+              <Select
+                value={resultsPerPage.toString()}
+                onValueChange={handleResultsPerPageChange}
+              >
+                <SelectTrigger className="w-20">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {RESULTS_PER_PAGE_OPTIONS.map((option) => (
+                    <SelectItem key={option} value={option.toString()}>
+                      {option}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          )}
         </div>
 
         {/* Search Tabs */}
@@ -194,11 +244,11 @@ export default function Search() {
                 className="relative"
                 onClick={() => setActiveTab(tab.id)}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-4 h-4 mr-2" />
                 {tab.label}
                 {activeTab === tab.id && (
                   <motion.div
-                    className="absolute bottom-0 w-full h-[1px] bg-white"
+                    className="absolute bottom-0 w-full h-[2px] bg-blue-600"
                     layoutId="underline"
                   />
                 )}
@@ -207,169 +257,134 @@ export default function Search() {
           })}
         </div>
 
-        {/* Search Results */}
-        <div className="space-y-6">
-          {/* Web Results */}
-          {(activeTab === "all" || activeTab === "web") && (
-            <div className="space-y-6">
-              {searchResults.web.map((result) => (
-                <div key={result.id} className="max-w-2xl">
-                  <div className="flex items-center gap-2 mb-1">
-                    <Image
-                      src={result.favicon || "/placeholder.svg"}
-                      alt="gambar"
-                      className="w-4 h-4"
-                      width={16}
-                      height={16}
-                    />
-                    <span className="text-sm text-gray-600">{result.url}</span>
-                    <Clock className="w-3 h-3 text-muted-foreground" />
-                    <span className="text-xs text-muted-foreground">
-                      {result.timestamp}
-                    </span>
-                  </div>
-                  <h3 className="text-xl text-blue-300 hover:underline cursor-pointer mb-1">
-                    {result.title}
-                  </h3>
-                  <p className="text-foreground text-sm leading-relaxed">
-                    {result.description}
-                  </p>
-                </div>
-              ))}
-            </div>
-          )}
+        {/* Error State */}
+        {error && (
+          <Alert className="mb-6 border-red-200 bg-red-50 dark:bg-red-950/20">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
 
-          {/* Images */}
-          {(activeTab === "all" || activeTab === "images") && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <ImageIcon className="w-5 h-5" />
-                Images
-              </h2>
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                {searchResults.images.map((image) => (
-                  <div key={image.id} className="group cursor-pointer">
-                    <div className="aspect-square overflow-hidden rounded-lg bg-muted">
-                      <Image
-                        src={image.src || "/placeholder.svg"}
-                        alt={image.alt}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform"
-                        width={300}
-                        height={300}
-                      />
-                    </div>
-                    <p className="text-xs text-muted-foreground mt-1 truncate">
-                      {image.source}
-                    </p>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Videos */}
-          {(activeTab === "all" || activeTab === "videos") && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <Video className="w-5 h-5" />
-                Videos
-              </h2>
-              <div className="space-y-4">
-                {searchResults.videos.map((video) => (
-                  <Card
-                    key={video.id}
-                    className="hover:shadow-md transition-shadow cursor-pointer"
-                  >
-                    <CardContent className="p-4">
-                      <div className="flex gap-4">
-                        <div className="relative">
-                          <Image
-                            src={video.thumbnail || "/placeholder.svg"}
-                            alt={video.title}
-                            className="w-48 h-28 object-cover rounded"
-                            width={300}
-                            height={300}
-                          />
-                          <Badge className="absolute bottom-2 right-2 bg-black/80 text-white text-xs">
-                            {video.duration}
-                          </Badge>
-                        </div>
-                        <div className="flex-1">
-                          <h3 className="font-semibold text-blue-300 hover:underline mb-1">
-                            {video.title}
-                          </h3>
-                          <p className="text-sm text-gray-600 mb-1">
-                            {video.channel}
-                          </p>
-                          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                            <span>{video.views}</span>
-                            <span>•</span>
-                            <span>{video.timestamp}</span>
-                          </div>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* News */}
-          {(activeTab === "all" || activeTab === "news") && (
-            <div>
-              <h2 className="text-lg font-semibold mb-4 flex items-center gap-2">
-                <News className="w-5 h-5" />
-                News
-              </h2>
-              <div className="space-y-4">
-                {searchResults.news.map((article) => (
-                  <div
-                    key={article.id}
-                    className="border-l-4 border-blue-300 pl-4"
-                  >
-                    <h3 className="font-semibold text-blue-300 hover:underline cursor-pointer mb-1">
-                      {article.title}
-                    </h3>
-                    <div className="flex items-center gap-2 text-sm text-gray-600">
-                      <span>{article.source}</span>
-                      <span>•</span>
-                      <span>{article.timestamp}</span>
-                      <Badge variant="secondary" className="text-xs">
-                        {article.category}
-                      </Badge>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* Related Searches */}
-          <div className="mt-12">
-            <h2 className="text-lg font-semibold mb-4">Related searches</h2>
-            <div className="flex flex-wrap gap-2">
-              {[
-                "best anime 2024",
-                "anime streaming sites",
-                "manga vs anime",
-                "studio ghibli movies",
-                "anime conventions",
-                "japanese animation history",
-                "anime art style",
-                "popular anime characters",
-              ].map((term) => (
-                <Badge
-                  key={term}
-                  variant="outline"
-                  className="cursor-pointer hover:bg-muted px-3 py-1"
-                >
-                  {term}
-                </Badge>
-              ))}
-            </div>
+        {/* Empty State */}
+        {!loading && !error && query && searchResults.length === 0 && (
+          <div className="text-center py-12">
+            <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">No results found</h3>
+            <p className="text-muted-foreground mb-4">
+              Try different keywords or check your spelling
+            </p>
           </div>
-        </div>
+        )}
+
+        {/* Search Results */}
+        {!loading && searchResults.length > 0 && (
+          <div className="space-y-6">
+            {/* All Results */}
+            {activeTab === "all" && (
+              <div className="space-y-6">
+                {searchResults.map((result, index) => (
+                  <motion.div
+                    key={`${result.index}-${result.id}`}
+                    className="max-w-4xl"
+                    initial={{ opacity: 0, y: 20 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ duration: 0.3, delay: index * 0.05 }}
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="w-4 h-4 bg-blue-600 rounded-sm flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">
+                          {result.index.charAt(0).toUpperCase()}
+                        </span>
+                      </div>
+                      <span className="text-sm text-gray-600">
+                        {formatResultUrl(result)}
+                      </span>
+                      <Badge variant="outline" className="text-xs">
+                        {result.index}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        Score: {result.score.toFixed(2)}
+                      </span>
+                    </div>
+                    <h3 className="text-xl text-blue-600 hover:underline cursor-pointer mb-1">
+                      {formatResultTitle(result)}
+                    </h3>
+                    <p className="text-foreground text-sm leading-relaxed">
+                      {formatResultDescription(result)}
+                    </p>
+
+                    {/* Show additional fields */}
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {Object.entries(result.source)
+                        .filter(
+                          ([key, value]) =>
+                            ![
+                              "title",
+                              "description",
+                              "content",
+                              "body",
+                              "url",
+                              "link",
+                              "id",
+                              "indexed_at",
+                              "file_name",
+                              "file_size",
+                            ].includes(key) &&
+                            value &&
+                            typeof value === "string" &&
+                            value.length < 50
+                        )
+                        .slice(0, 3)
+                        .map(([key, value]) => (
+                          <Badge
+                            key={key}
+                            variant="secondary"
+                            className="text-xs"
+                          >
+                            {key}: {value}
+                          </Badge>
+                        ))}
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            )}
+
+            {/* Filtered Results by Type */}
+            {activeTab !== "all" && (
+              <div className="text-center py-8">
+                <p className="text-muted-foreground">
+                  Content filtering by type is not yet implemented for indexed
+                  data. All results are shown in the &quot;All&quot; tab.
+                </p>
+              </div>
+            )}
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="mt-8">
+                <SearchPagination
+                  currentPage={currentPage}
+                  totalPages={totalPages}
+                  totalResults={totalResults}
+                  resultsPerPage={resultsPerPage}
+                  onPageChange={handlePageChange}
+                />
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* No Query State */}
+        {!query && (
+          <div className="text-center py-12">
+            <SearchIcon className="w-12 h-12 text-muted-foreground mx-auto mb-4" />
+            <h3 className="text-lg font-semibold mb-2">Start searching</h3>
+            <p className="text-muted-foreground">
+              Enter a search query to find documents in your indexed data
+            </p>
+          </div>
+        )}
       </div>
 
       {/* Footer */}
