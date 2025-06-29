@@ -7,9 +7,12 @@ import BlurText from "@/components/text-animations/BlurText/BlurText";
 import { PlaceholdersAndVanishInput } from "@/components/ui/placeholders-and-vanish-input";
 import { useState } from "react";
 import { Zap } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function Home() {
   const [showMain, setShowMain] = useState<boolean>(false);
+  const [searchInput, setSearchInput] = useState<string>("");
+  const router = useRouter();
 
   const placeholders = [
     "Anime",
@@ -25,12 +28,14 @@ export default function Home() {
   ];
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log(e.target.value);
+    setSearchInput(e.target.value);
   };
 
   const onSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    console.log("submitted");
+    setTimeout(() => {
+      router.push(`/search?q=${searchInput}`);
+    }, 500);
   };
 
   return (
